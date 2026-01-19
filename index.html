@@ -1,8 +1,9 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>AI Scan Botol Air Mineral</title>
+  <title>AI Scan Botol</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <!-- TensorFlow.js -->
@@ -12,119 +13,130 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f4f6f8;
+      background: #f2f4f6;
+      margin: 0;
+      padding: 10px;
       text-align: center;
-      padding: 20px;
     }
-    video, canvas {
+    h2 { margin: 10px 0; }
+    video {
       width: 100%;
       max-width: 420px;
       border-radius: 12px;
-      margin-top: 10px;
+      background: black;
     }
-    button {
-      padding: 12px 20px;
-      margin-top: 15px;
-      font-size: 16px;
-      border-radius: 8px;
-      border: none;
-      background: #198754;
-      color: white;
-    }
-    .result {
+    .card {
       background: white;
-      padding: 15px;
+      padding: 12px;
+      margin-top: 10px;
       border-radius: 10px;
-      margin-top: 15px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
       text-align: left;
+      font-size: 14px;
+    }
+    .status {
+      font-weight: bold;
+      margin-bottom: 6px;
     }
   </style>
 </head>
 <body>
 
-<h2>📷 AI Scan Botol (TensorFlow.js)</h2>
+<h2>📷 AI Scanner Botol</h2>
 
 <video id="video" autoplay playsinline></video>
 <canvas id="canvas" style="display:none;"></canvas>
 
-<button onclick="scan()">Scan Botol</button>
-
-<div class="result" id="result">
-  <b>Status:</b> Model belum dimuat
+<div class="card">
+  <div class="status" id="status">⏳ Inisialisasi...</div>
+  <div id="result">Menunggu kamera & model AI</div>
 </div>
 
 <script>
-const video = document.getElementById('video');
-const canvas = document.getElementById('canvas');
-const resultDiv = document.getElementById('result');
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const statusEl = document.getElementById("status");
+const resultEl = document.getElementById("result");
 
-let model;
+let model = null;
+let readyCamera = false;
+let scanning = false;
 
-// AKSES KAMERA BELAKANG
+// 1. AKSES KAMERA
 navigator.mediaDevices.getUserMedia({
   video: { facingMode: "environment" },
   audio: false
 })
 .then(stream => {
   video.srcObject = stream;
+  video.onloadedmetadata = () => {
+    video.play();
+    readyCamera = true;
+    statusEl.innerText = "📷 Kamera siap";
+    startScanLoop();
+  };
 })
-.catch(() => alert("Kamera tidak bisa diakses"));
+.catch(err => {
+  statusEl.innerText = "❌ Kamera gagal diakses";
+  console.error(err);
+});
 
-// LOAD MODEL
-async function loadModel() {
-  resultDiv.innerHTML = "<b>Status:</b> Memuat model AI...";
-  model = await mobilenet.load();
-  resultDiv.innerHTML = "<b>Status:</b> Model siap. Silakan scan botol.";
+// 2. LOAD MODEL AI
+mobilenet.load().then(m => {
+  model = m;
+  statusEl.innerText = "🧠 Model AI siap";
+});
+
+// 3. AUTO SCAN LOOP
+function startScanLoop() {
+  if (scanning) return;
+  scanning = true;
+
+  setInterval(async () => {
+    if (!model || !readyCamera) return;
+    await scanFrame();
+  }, 2000); // scan tiap 2 detik
 }
-loadModel();
 
-// SCAN GAMBAR
-async function scan() {
-  if (!model) return;
+// 4. SCAN FRAME
+async function scanFrame() {
+  if (video.videoWidth === 0) return;
 
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext("2d");
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   ctx.drawImage(video, 0, 0);
 
   const predictions = await model.classify(canvas);
-
-  showResult(predictions);
+  processResult(predictions);
 }
 
-// TAMPILKAN HASIL
-function showResult(predictions) {
-  if (predictions.length === 0) {
-    resultDiv.innerHTML = "❌ Tidak terdeteksi objek.";
-    return;
-  }
+// 5. PROSES HASIL
+function processResult(predictions) {
+  if (!predictions || predictions.length === 0) return;
 
-  let html = "<b>Hasil AI:</b><br><br>";
+  let detectedBottle = false;
+  let text = "";
+
   predictions.forEach(p => {
-    html += `
-      🔍 ${p.className}<br>
-      🎯 Akurasi: ${(p.probability * 100).toFixed(2)}%<br><br>
-    `;
+    text += `• ${p.className} (${(p.probability*100).toFixed(1)}%)<br>`;
+    if (p.className.toLowerCase().includes("bottle")) {
+      detectedBottle = true;
+    }
   });
 
-  // SIMULASI LOGIKA BOTOL
-  const detectedBottle = predictions.some(p =>
-    p.className.toLowerCase().includes("bottle")
-  );
-
   if (detectedBottle) {
-    html += `
-      ♻️ <b>Kesimpulan:</b> Botol terdeteksi<br>
-      🧴 Jenis: Botol Minuman<br>
-      ♻️ Plastik: PET (perkiraan)<br>
-      💰 Nilai Daur Ulang: ± Rp 300
+    statusEl.innerText = "♻️ BOTOL TERDETEKSI";
+    resultEl.innerHTML = `
+      <b>Jenis:</b> Botol Minuman<br>
+      <b>Material:</b> Plastik (PET)<br>
+      <b>Estimasi nilai:</b> Rp 300 / pcs<br><br>
+      <b>Detail AI:</b><br>${text}
     `;
   } else {
-    html += "⚠️ Objek bukan botol.";
+    statusEl.innerText = "ℹ️ Objek lain";
+    resultEl.innerHTML = text;
   }
-
-  resultDiv.innerHTML = html;
 }
 </script>
 
