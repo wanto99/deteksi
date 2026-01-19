@@ -1,284 +1,580 @@
-    <div class="camera-container">
-        <video id="video" autoplay playsinline></video>
-        <div class="camera-overlay">
-            <div class="scanning-box"></div>
-        </div>
-    </div>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deteksi Merek Botol Minuman</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background-color: #f0f2f5;
+            color: #333;
+            line-height: 1.6;
+            padding: 10px;
+            max-width: 100vw;
+            overflow-x: hidden;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            padding: 15px;
+            background: linear-gradient(135deg, #1a73e8, #0d47a1);
+            color: white;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        .video-container {
+            position: relative;
+            width: 100%;
+            background-color: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        #video {
+            width: 100%;
+            display: block;
+            transform: scaleX(-1); /* Mirror untuk kamera belakang */
+        }
+        .video-overlay {
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.6);
+            padding: 8px;
+            font-size: 0.8rem;
+        }
+        .controls {
+            background-color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        .section-title {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: #1a73e8;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #e8f0fe;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        input[type="text"], input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dadce0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        input[type="text"]:focus, input[type="file"]:focus {
+            border-color: #1a73e8;
+            outline: none;
+        }
+        .button {
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.3s, transform 0.2s;
+            margin-top: 5px;
+        }
+        .button:hover {
+            background-color: #0d62d9;
+        }
+        .button:active {
+            transform: scale(0.98);
+        }
+        .button.secondary {
+            background-color: #5f6368;
+        }
+        .button.secondary:hover {
+            background-color: #4a4d52;
+        }
+        .brand-list {
+            background-color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        #brandContainer {
+            margin-top: 15px;
+        }
+        .brand-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #e8f0fe;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            background-color: #f8f9fa;
+        }
+        .brand-preview {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-right: 15px;
+            border: 2px solid #dadce0;
+        }
+        .brand-info {
+            flex: 1;
+        }
+        .brand-name {
+            font-weight: bold;
+            color: #1a73e8;
+        }
+        .result-panel {
+            background-color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            text-align: center;
+        }
+        #resultStatus {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            min-height: 2.5rem;
+        }
+        .detected {
+            color: #34a853;
+        }
+        .not-detected {
+            color: #ea4335;
+        }
+        #resultDetails {
+            font-size: 1rem;
+            color: #5f6368;
+        }
+        .progress-container {
+            height: 20px;
+            background-color: #f1f3f4;
+            border-radius: 10px;
+            margin: 15px 0;
+            overflow: hidden;
+        }
+        #similarityBar {
+            height: 100%;
+            background: linear-gradient(90deg, #ea4335, #fbbc05, #34a853);
+            width: 0%;
+            transition: width 0.5s;
+            border-radius: 10px;
+        }
+        .threshold-info {
+            font-size: 0.9rem;
+            color: #5f6368;
+            margin-bottom: 10px;
+        }
+        .info-text {
+            font-size: 0.85rem;
+            color: #5f6368;
+            background-color: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border-left: 4px solid #1a73e8;
+        }
+        footer {
+            text-align: center;
+            padding: 15px;
+            color: #5f6368;
+            font-size: 0.8rem;
+            border-top: 1px solid #dadce0;
+            margin-top: 10px;
+        }
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.5rem;
+            }
+            .controls, .brand-list, .result-panel {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Deteksi Merek Botol Minuman</h1>
+            <p class="subtitle">Upload gambar referensi, arahkan kamera, sistem akan mendeteksi secara otomatis</p>
+        </header>
 
-    <div class="status-card">
-        <div class="status-section">
-            <h2><span class="status-indicator status-loading" id="cameraStatusIcon"></span> Status Kamera</h2>
-            <div class="status-text" id="cameraStatus">Menginisialisasi kamera...</div>
+        <div class="video-container">
+            <video id="video" autoplay playsinline></video>
+            <div class="video-overlay">Kamera Belakang Aktif</div>
         </div>
 
-        <div class="status-section">
-            <h2><span class="status-indicator status-loading" id="modelStatusIcon"></span> Status AI Model</h2>
-            <div class="status-text" id="modelStatus">Memuat model MobileNet...</div>
-        </div>
-
-        <div class="status-section">
-            <h2><span class="status-indicator" id="detectionStatusIcon"></span> Hasil Deteksi</h2>
-            <div class="status-text" id="detectionStatus">Menunggu deteksi...</div>
-            <div class="confidence-bar">
-                <div class="confidence-fill" id="confidenceBar" style="width: 0%"></div>
+        <div class="controls">
+            <h2 class="section-title">📁 Tambah Referensi Merek</h2>
+            <div class="input-group">
+                <label for="brandName">Nama Merek</label>
+                <input type="text" id="brandName" placeholder="Contoh: Aqua, Coca-Cola, Mizone">
             </div>
-            <div class="info-grid">
-                <div class="info-item">
-                    <div class="info-label">Jenis</div>
-                    <div class="info-value" id="infoType">-</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Material</div>
-                    <div class="info-value" id="infoMaterial">-</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Estimasi Nilai</div>
-                    <div class="info-value" id="infoValue">-</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Akurasi</div>
-                    <div class="info-value" id="infoAccuracy">-</div>
-                </div>
+            <div class="input-group">
+                <label for="imageUpload">Gambar Referensi (Logo/Botol)</label>
+                <input type="file" id="imageUpload" accept="image/*" capture="environment">
             </div>
+            <button id="addBrandBtn" class="button">➕ Tambahkan Merek</button>
+            <p class="info-text">Gambar referensi akan disimpan di memori browser. Pastikan gambar cukup jelas dan mewakili merek.</p>
         </div>
+
+        <div class="brand-list">
+            <h2 class="section-title">📋 Daftar Merek Referensi</h2>
+            <div id="brandContainer">
+                <p id="emptyBrandMessage" style="color: #5f6368; text-align: center;">Belum ada merek ditambahkan. Silakan tambahkan gambar referensi di atas.</p>
+            </div>
+            <button id="clearAllBtn" class="button secondary">🗑️ Hapus Semua Merek</button>
+        </div>
+
+        <div class="result-panel">
+            <h2 class="section-title">📊 Hasil Deteksi Real-Time</h2>
+            <div class="threshold-info">Threshold deteksi: <strong>70%</strong> | Pindai otomatis setiap 2 detik</div>
+            <div id="resultStatus" class="not-detected">Menunggu...</div>
+            <div class="progress-container">
+                <div id="similarityBar"></div>
+            </div>
+            <div id="resultDetails">Arahkan kamera ke botol minuman. Pastikan cahaya cukup.</div>
+        </div>
+
+        <footer>
+            <p>Aplikasi Deteksi Merek Botol | Berjalan 100% di browser | Tidak ada data yang dikirim ke server</p>
+        </footer>
     </div>
 
-    <div class="footer">
-        Gunakan kamera belakang • Auto scan setiap 2 detik • TensorFlow.js MobileNet
-    </div>
-</div>
+    <script>
+        // DOM Elements
+        const video = document.getElementById('video');
+        const brandNameInput = document.getElementById('brandName');
+        const imageUploadInput = document.getElementById('imageUpload');
+        const addBrandBtn = document.getElementById('addBrandBtn');
+        const brandContainer = document.getElementById('brandContainer');
+        const emptyBrandMessage = document.getElementById('emptyBrandMessage');
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        const resultStatus = document.getElementById('resultStatus');
+        const similarityBar = document.getElementById('similarityBar');
+        const resultDetails = document.getElementById('resultDetails');
 
-<script>
-    // State aplikasi
-    const state = {
-        video: null,
-        model: null,
-        isCameraReady: false,
-        isModelReady: false,
-        scanInterval: null,
-        lastScanTime: null
-    };
+        // Global Variables
+        let brands = JSON.parse(localStorage.getItem('brands')) || [];
+        let cameraStream = null;
+        let scanInterval = null;
+        const SCAN_INTERVAL = 2000; // 2 detik
+        const SIMILARITY_THRESHOLD = 0.7; // 70%
 
-    // Elemen DOM
-    const video = document.getElementById('video');
-    const cameraStatus = document.getElementById('cameraStatus');
-    const cameraStatusIcon = document.getElementById('cameraStatusIcon');
-    const modelStatus = document.getElementById('modelStatus');
-    const modelStatusIcon = document.getElementById('modelStatusIcon');
-    const detectionStatus = document.getElementById('detectionStatus');
-    const detectionStatusIcon = document.getElementById('detectionStatusIcon');
-    const confidenceBar = document.getElementById('confidenceBar');
-    const infoType = document.getElementById('infoType');
-    const infoMaterial = document.getElementById('infoMaterial');
-    const infoValue = document.getElementById('infoValue');
-    const infoAccuracy = document.getElementById('infoAccuracy');
+        // Initialize
+        document.addEventListener('DOMContentLoaded', init);
 
-    // Inisialisasi kamera
-    async function initCamera() {
-        try {
-            updateCameraStatus('loading', 'Mengakses kamera belakang...');
-            
-            const constraints = {
-                video: {
-                    facingMode: 'environment',
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                }
-            };
-            
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            video.srcObject = stream;
-            
-            return new Promise((resolve) => {
-                video.onloadedmetadata = () => {
-                    video.play();
-                    updateCameraStatus('ready', 'Kamera belakang siap');
-                    state.isCameraReady = true;
-                    resolve();
+        async function init() {
+            await startCamera();
+            renderBrands();
+            startScanning();
+            setupEventListeners();
+        }
+
+        // Start back camera
+        async function startCamera() {
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    },
+                    audio: false
                 };
+                cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = cameraStream;
+                console.log('Kamera belakang berhasil diakses');
+            } catch (err) {
+                console.error('Gagal mengakses kamera:', err);
+                resultStatus.textContent = 'Kamera tidak dapat diakses';
+                resultStatus.className = 'not-detected';
+                resultDetails.textContent = 'Pastikan izin kamera diberikan dan gunakan perangkat dengan kamera belakang.';
+            }
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            addBrandBtn.addEventListener('click', addBrand);
+            clearAllBtn.addEventListener('click', clearAllBrands);
+            imageUploadInput.addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    brandNameInput.focus();
+                }
             });
-        } catch (error) {
-            console.error('Error kamera:', error);
-            let message = 'Gagal mengakses kamera';
-            if (error.name === 'NotAllowedError') {
-                message = 'Izin kamera ditolak. Izinkan akses kamera di pengaturan browser.';
-            } else if (error.name === 'NotFoundError') {
-                message = 'Kamera belakang tidak ditemukan. Pastikan perangkat memiliki kamera belakang.';
+        }
+
+        // Add new brand reference
+        function addBrand() {
+            const name = brandNameInput.value.trim();
+            const file = imageUploadInput.files[0];
+
+            if (!name) {
+                alert('Masukkan nama merek terlebih dahulu.');
+                brandNameInput.focus();
+                return;
             }
-            updateCameraStatus('error', message);
-            throw error;
-        }
-    }
 
-    // Memuat model AI
-    async function loadModel() {
-        try {
-            updateModelStatus('loading', 'Memuat model MobileNet...');
-            state.model = await mobilenet.load({ version: 2, alpha: 0.5 });
-            updateModelStatus('ready', 'Model AI siap');
-            state.isModelReady = true;
-        } catch (error) {
-            console.error('Error model:', error);
-            updateModelStatus('error', 'Gagal memuat model AI');
-            throw error;
-        }
-    }
+            if (!file) {
+                alert('Pilih gambar referensi terlebih dahulu.');
+                imageUploadInput.focus();
+                return;
+            }
 
-    // Fungsi deteksi
-    async function detect() {
-        if (!state.isCameraReady || !state.isModelReady || !video.videoWidth) {
-            return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const brand = {
+                    id: Date.now(),
+                    name: name,
+                    imageUrl: e.target.result
+                };
+                brands.push(brand);
+                saveBrands();
+                renderBrands();
+                brandNameInput.value = '';
+                imageUploadInput.value = '';
+                brandNameInput.focus();
+                console.log(`Merek "${name}" ditambahkan.`);
+            };
+            reader.readAsDataURL(file);
         }
 
-        try {
-            updateDetectionStatus('loading', 'Menganalisis gambar...');
+        // Save brands to localStorage
+        function saveBrands() {
+            localStorage.setItem('brands', JSON.stringify(brands));
+        }
+
+        // Render brands list
+        function renderBrands() {
+            if (brands.length === 0) {
+                emptyBrandMessage.style.display = 'block';
+                brandContainer.innerHTML = '';
+                return;
+            }
+            emptyBrandMessage.style.display = 'none';
+            brandContainer.innerHTML = brands.map(brand => `
+                <div class="brand-item" data-id="${brand.id}">
+                    <img src="${brand.imageUrl}" alt="${brand.name}" class="brand-preview">
+                    <div class="brand-info">
+                        <div class="brand-name">${brand.name}</div>
+                        <small>ID: ${brand.id}</small>
+                    </div>
+                    <button onclick="removeBrand(${brand.id})" class="button secondary" style="padding: 8px 12px; font-size: 0.9rem;">Hapus</button>
+                </div>
+            `).join('');
+        }
+
+        // Remove a brand
+        function removeBrand(id) {
+            brands = brands.filter(brand => brand.id !== id);
+            saveBrands();
+            renderBrands();
+        }
+
+        // Clear all brands
+        function clearAllBrands() {
+            if (confirm('Hapus semua merek referensi? Tindakan ini tidak dapat dibatalkan.')) {
+                brands = [];
+                saveBrands();
+                renderBrands();
+                console.log('Semua merek telah dihapus.');
+            }
+        }
+
+        // Start automatic scanning
+        function startScanning() {
+            if (scanInterval) clearInterval(scanInterval);
+            scanInterval = setInterval(scanFrame, SCAN_INTERVAL);
+            console.log(`Pemindaian dimulai setiap ${SCAN_INTERVAL/1000} detik.`);
+        }
+
+        // Capture frame and compare with references
+        async function scanFrame() {
+            if (brands.length === 0) {
+                updateResult('Tidak ada referensi', 0, 'Tambahkan gambar referensi terlebih dahulu.', false);
+                return;
+            }
+
+            if (!cameraStream) {
+                updateResult('Kamera tidak aktif', 0, 'Pastikan kamera berjalan.', false);
+                return;
+            }
+
+            // Capture current video frame to canvas
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Compare with each brand reference
+            let bestMatch = { brand: null, similarity: 0 };
+            for (const brand of brands) {
+                const similarity = await compareImages(canvas, brand.imageUrl);
+                if (similarity > bestMatch.similarity) {
+                    bestMatch = { brand, similarity };
+                }
+            }
+
+            // Display result
+            if (bestMatch.similarity >= SIMILARITY_THRESHOLD) {
+                updateResult(
+                    `✅ ${bestMatch.brand.name} Terdeteksi`,
+                    bestMatch.similarity,
+                    `Kemiripan tinggi dengan "${bestMatch.brand.name}"`,
+                    true
+                );
+            } else if (bestMatch.similarity > 0.3) {
+                updateResult(
+                    '❌ Tidak Terdeteksi',
+                    bestMatch.similarity,
+                    `Kemiripan tertinggi: ${(bestMatch.similarity*100).toFixed(1)}% dengan "${bestMatch.brand?.name || 'tidak diketahui'}"`,
+                    false
+                );
+            } else {
+                updateResult(
+                    '❌ Tidak Terdeteksi',
+                    bestMatch.similarity,
+                    'Tidak ada kemiripan dengan merek referensi.',
+                    false
+                );
+            }
+        }
+
+        // Compare two images using pixel and histogram analysis
+        async function compareImages(canvasLive, referenceImageUrl) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = function() {
+                    // Create canvas for reference image
+                    const refCanvas = document.createElement('canvas');
+                    const refCtx = refCanvas.getContext('2d');
+                    
+                    // Scale both images to same smaller size for faster processing
+                    const compareSize = 64;
+                    refCanvas.width = compareSize;
+                    refCanvas.height = compareSize;
+                    const liveCanvas = document.createElement('canvas');
+                    const liveCtx = liveCanvas.getContext('2d');
+                    liveCanvas.width = compareSize;
+                    liveCanvas.height = compareSize;
+                    
+                    // Draw scaled images
+                    refCtx.drawImage(img, 0, 0, compareSize, compareSize);
+                    liveCtx.drawImage(canvasLive, 0, 0, compareSize, compareSize);
+                    
+                    // Get image data
+                    const refData = refCtx.getImageData(0, 0, compareSize, compareSize).data;
+                    const liveData = liveCtx.getImageData(0, 0, compareSize, compareSize).data;
+                    
+                    // 1. Pixel average comparison (simple)
+                    let pixelDiffSum = 0;
+                    const numPixels = compareSize * compareSize * 4; // 4 channels (RGBA)
+                    
+                    for (let i = 0; i < numPixels; i += 4) {
+                        const rDiff = Math.abs(refData[i] - liveData[i]);
+                        const gDiff = Math.abs(refData[i+1] - liveData[i+1]);
+                        const bDiff = Math.abs(refData[i+2] - liveData[i+2]);
+                        pixelDiffSum += rDiff + gDiff + bDiff;
+                    }
+                    
+                    const maxPixelDiff = 255 * 3 * numPixels / 4;
+                    const pixelSimilarity = 1 - (pixelDiffSum / maxPixelDiff);
+                    
+                    // 2. Histogram comparison (color distribution)
+                    const refHistogram = createHistogram(refData);
+                    const liveHistogram = createHistogram(liveData);
+                    
+                    let histDiffSum = 0;
+                    for (let i = 0; i < 64; i++) {
+                        histDiffSum += Math.abs(refHistogram[i] - liveHistogram[i]);
+                    }
+                    const histSimilarity = 1 - (histDiffSum / 2); // Normalize
+                    
+                    // Combine scores (weighted average)
+                    const combinedSimilarity = (pixelSimilarity * 0.6 + histSimilarity * 0.4);
+                    resolve(combinedSimilarity);
+                };
+                img.src = referenceImageUrl;
+            });
+        }
+
+        // Create color histogram from image data (simplified)
+        function createHistogram(imageData) {
+            const histogram = new Array(64).fill(0); // 4x4x4 histogram
+            for (let i = 0; i < imageData.length; i += 4) {
+                const r = Math.floor(imageData[i] / 64); // 0-3
+                const g = Math.floor(imageData[i+1] / 64);
+                const b = Math.floor(imageData[i+2] / 64);
+                const index = r * 16 + g * 4 + b;
+                histogram[index]++;
+            }
+            // Normalize
+            const total = imageData.length / 4;
+            return histogram.map(val => val / total);
+        }
+
+        // Update result display
+        function updateResult(status, similarity, details, isDetected) {
+            resultStatus.textContent = status;
+            resultStatus.className = isDetected ? 'detected' : 'not-detected';
+            similarityBar.style.width = `${similarity * 100}%`;
+            resultDetails.textContent = details;
             
-            const predictions = await state.model.classify(video);
-            const topPrediction = predictions[0];
-            
-            processPrediction(topPrediction);
-            
-            state.lastScanTime = Date.now();
-        } catch (error) {
-            console.error('Error deteksi:', error);
-            updateDetectionStatus('error', 'Error deteksi AI');
-        }
-    }
-
-    // Proses hasil prediksi
-    function processPrediction(prediction) {
-        const className = prediction.className.toLowerCase();
-        const confidence = Math.round(prediction.probability * 100);
-        
-        // Update UI umum
-        confidenceBar.style.width = `${confidence}%`;
-        infoAccuracy.textContent = `${confidence}%`;
-        
-        // Cek apakah ini botol
-        const isBottle = className.includes('bottle') || 
-                        className.includes('water bottle') || 
-                        className.includes('pet bottle');
-        
-        if (isBottle) {
-            updateDetectionStatus('success', 'Botol terdeteksi');
-            infoType.textContent = 'Botol Minuman';
-            infoType.classList.add('bottle-detected');
-            infoMaterial.textContent = 'Plastik (PET)';
-            infoValue.textContent = 'Rp 300';
-            
-            // Update nilai spesifik botol
-            infoType.textContent = prediction.className.split(',')[0];
-        } else {
-            updateDetectionStatus('ready', 'Objek terdeteksi');
-            infoType.textContent = prediction.className.split(',')[0];
-            infoType.classList.remove('bottle-detected');
-            infoMaterial.textContent = '-';
-            infoValue.textContent = '-';
-        }
-    }
-
-    // Update status kamera
-    function updateCameraStatus(status, message) {
-        cameraStatus.textContent = message;
-        cameraStatusIcon.className = 'status-indicator';
-        
-        switch(status) {
-            case 'loading':
-                cameraStatusIcon.classList.add('status-loading');
-                break;
-            case 'ready':
-                cameraStatusIcon.classList.add('status-ready');
-                break;
-            case 'error':
-                cameraStatusIcon.classList.add('status-error');
-                break;
-        }
-    }
-
-    // Update status model
-    function updateModelStatus(status, message) {
-        modelStatus.textContent = message;
-        modelStatusIcon.className = 'status-indicator';
-        
-        switch(status) {
-            case 'loading':
-                modelStatusIcon.classList.add('status-loading');
-                break;
-            case 'ready':
-                modelStatusIcon.classList.add('status-ready');
-                break;
-            case 'error':
-                modelStatusIcon.classList.add('status-error');
-                break;
-        }
-    }
-
-    // Update status deteksi
-    function updateDetectionStatus(status, message) {
-        detectionStatus.textContent = message;
-        detectionStatusIcon.className = 'status-indicator';
-        
-        switch(status) {
-            case 'loading':
-                detectionStatusIcon.classList.add('status-loading');
-                break;
-            case 'ready':
-                detectionStatusIcon.classList.add('status-ready');
-                break;
-            case 'success':
-                detectionStatusIcon.classList.add('status-ready');
-                break;
-            case 'error':
-                detectionStatusIcon.classList.add('status-error');
-                break;
-        }
-    }
-
-    // Start auto scan
-    function startAutoScan() {
-        // Scan pertama segera
-        setTimeout(() => {
-            if (state.isCameraReady && state.isModelReady) {
-                detect();
-            }
-        }, 1000);
-        
-        // Scan interval setiap 2 detik
-        state.scanInterval = setInterval(() => {
-            if (state.isCameraReady && state.isModelReady) {
-                detect();
-            }
-        }, 2000);
-    }
-
-    // Inisialisasi aplikasi
-    async function initApp() {
-        try {
-            await Promise.all([initCamera(), loadModel()]);
-            startAutoScan();
-        } catch (error) {
-            console.error('Inisialisasi gagal:', error);
-        }
-    }
-
-    // Event listener untuk visibility change
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-            if (state.scanInterval) {
-                clearInterval(state.scanInterval);
-                state.scanInterval = null;
-            }
-        } else {
-            if (!state.scanInterval && state.isCameraReady && state.isModelReady) {
-                startAutoScan();
+            // Update similarity bar color based on threshold
+            if (similarity >= SIMILARITY_THRESHOLD) {
+                similarityBar.style.background = '#34a853';
+            } else if (similarity >= 0.4) {
+                similarityBar.style.background = '#fbbc05';
+            } else {
+                similarityBar.style.background = '#ea4335';
             }
         }
-    });
 
-    // Start aplikasi saat halaman dimuat
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initApp);
-    } else {
-        initApp();
-    }
-</script>
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+            }
+            if (scanInterval) clearInterval(scanInterval);
+        });
+    </script>
+</body>
+</html>
