@@ -1,145 +1,284 @@
+    <div class="camera-container">
+        <video id="video" autoplay playsinline></video>
+        <div class="camera-overlay">
+            <div class="scanning-box"></div>
+        </div>
+    </div>
 
-<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <title>AI Scan Botol</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <div class="status-card">
+        <div class="status-section">
+            <h2><span class="status-indicator status-loading" id="cameraStatusIcon"></span> Status Kamera</h2>
+            <div class="status-text" id="cameraStatus">Menginisialisasi kamera...</div>
+        </div>
 
-  <!-- TensorFlow.js -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+        <div class="status-section">
+            <h2><span class="status-indicator status-loading" id="modelStatusIcon"></span> Status AI Model</h2>
+            <div class="status-text" id="modelStatus">Memuat model MobileNet...</div>
+        </div>
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f2f4f6;
-      margin: 0;
-      padding: 10px;
-      text-align: center;
-    }
-    h2 { margin: 10px 0; }
-    video {
-      width: 100%;
-      max-width: 420px;
-      border-radius: 12px;
-      background: black;
-    }
-    .card {
-      background: white;
-      padding: 12px;
-      margin-top: 10px;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-      text-align: left;
-      font-size: 14px;
-    }
-    .status {
-      font-weight: bold;
-      margin-bottom: 6px;
-    }
-  </style>
-</head>
-<body>
+        <div class="status-section">
+            <h2><span class="status-indicator" id="detectionStatusIcon"></span> Hasil Deteksi</h2>
+            <div class="status-text" id="detectionStatus">Menunggu deteksi...</div>
+            <div class="confidence-bar">
+                <div class="confidence-fill" id="confidenceBar" style="width: 0%"></div>
+            </div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">Jenis</div>
+                    <div class="info-value" id="infoType">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Material</div>
+                    <div class="info-value" id="infoMaterial">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Estimasi Nilai</div>
+                    <div class="info-value" id="infoValue">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Akurasi</div>
+                    <div class="info-value" id="infoAccuracy">-</div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-<h2>📷 AI Scanner Botol</h2>
-
-<video id="video" autoplay playsinline></video>
-<canvas id="canvas" style="display:none;"></canvas>
-
-<div class="card">
-  <div class="status" id="status">⏳ Inisialisasi...</div>
-  <div id="result">Menunggu kamera & model AI</div>
+    <div class="footer">
+        Gunakan kamera belakang • Auto scan setiap 2 detik • TensorFlow.js MobileNet
+    </div>
 </div>
 
 <script>
-const video = document.getElementById("video");
-const canvas = document.getElementById("canvas");
-const statusEl = document.getElementById("status");
-const resultEl = document.getElementById("result");
+    // State aplikasi
+    const state = {
+        video: null,
+        model: null,
+        isCameraReady: false,
+        isModelReady: false,
+        scanInterval: null,
+        lastScanTime: null
+    };
 
-let model = null;
-let readyCamera = false;
-let scanning = false;
+    // Elemen DOM
+    const video = document.getElementById('video');
+    const cameraStatus = document.getElementById('cameraStatus');
+    const cameraStatusIcon = document.getElementById('cameraStatusIcon');
+    const modelStatus = document.getElementById('modelStatus');
+    const modelStatusIcon = document.getElementById('modelStatusIcon');
+    const detectionStatus = document.getElementById('detectionStatus');
+    const detectionStatusIcon = document.getElementById('detectionStatusIcon');
+    const confidenceBar = document.getElementById('confidenceBar');
+    const infoType = document.getElementById('infoType');
+    const infoMaterial = document.getElementById('infoMaterial');
+    const infoValue = document.getElementById('infoValue');
+    const infoAccuracy = document.getElementById('infoAccuracy');
 
-// 1. AKSES KAMERA
-navigator.mediaDevices.getUserMedia({
-  video: { facingMode: "environment" },
-  audio: false
-})
-.then(stream => {
-  video.srcObject = stream;
-  video.onloadedmetadata = () => {
-    video.play();
-    readyCamera = true;
-    statusEl.innerText = "📷 Kamera siap";
-    startScanLoop();
-  };
-})
-.catch(err => {
-  statusEl.innerText = "❌ Kamera gagal diakses";
-  console.error(err);
-});
-
-// 2. LOAD MODEL AI
-mobilenet.load().then(m => {
-  model = m;
-  statusEl.innerText = "🧠 Model AI siap";
-});
-
-// 3. AUTO SCAN LOOP
-function startScanLoop() {
-  if (scanning) return;
-  scanning = true;
-
-  setInterval(async () => {
-    if (!model || !readyCamera) return;
-    await scanFrame();
-  }, 2000); // scan tiap 2 detik
-}
-
-// 4. SCAN FRAME
-async function scanFrame() {
-  if (video.videoWidth === 0) return;
-
-  const ctx = canvas.getContext("2d");
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  ctx.drawImage(video, 0, 0);
-
-  const predictions = await model.classify(canvas);
-  processResult(predictions);
-}
-
-// 5. PROSES HASIL
-function processResult(predictions) {
-  if (!predictions || predictions.length === 0) return;
-
-  let detectedBottle = false;
-  let text = "";
-
-  predictions.forEach(p => {
-    text += `• ${p.className} (${(p.probability*100).toFixed(1)}%)<br>`;
-    if (p.className.toLowerCase().includes("bottle")) {
-      detectedBottle = true;
+    // Inisialisasi kamera
+    async function initCamera() {
+        try {
+            updateCameraStatus('loading', 'Mengakses kamera belakang...');
+            
+            const constraints = {
+                video: {
+                    facingMode: 'environment',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            };
+            
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = stream;
+            
+            return new Promise((resolve) => {
+                video.onloadedmetadata = () => {
+                    video.play();
+                    updateCameraStatus('ready', 'Kamera belakang siap');
+                    state.isCameraReady = true;
+                    resolve();
+                };
+            });
+        } catch (error) {
+            console.error('Error kamera:', error);
+            let message = 'Gagal mengakses kamera';
+            if (error.name === 'NotAllowedError') {
+                message = 'Izin kamera ditolak. Izinkan akses kamera di pengaturan browser.';
+            } else if (error.name === 'NotFoundError') {
+                message = 'Kamera belakang tidak ditemukan. Pastikan perangkat memiliki kamera belakang.';
+            }
+            updateCameraStatus('error', message);
+            throw error;
+        }
     }
-  });
 
-  if (detectedBottle) {
-    statusEl.innerText = "♻️ BOTOL TERDETEKSI";
-    resultEl.innerHTML = `
-      <b>Jenis:</b> Botol Minuman<br>
-      <b>Material:</b> Plastik (PET)<br>
-      <b>Estimasi nilai:</b> Rp 300 / pcs<br><br>
-      <b>Detail AI:</b><br>${text}
-    `;
-  } else {
-    statusEl.innerText = "ℹ️ Objek lain";
-    resultEl.innerHTML = text;
-  }
-}
+    // Memuat model AI
+    async function loadModel() {
+        try {
+            updateModelStatus('loading', 'Memuat model MobileNet...');
+            state.model = await mobilenet.load({ version: 2, alpha: 0.5 });
+            updateModelStatus('ready', 'Model AI siap');
+            state.isModelReady = true;
+        } catch (error) {
+            console.error('Error model:', error);
+            updateModelStatus('error', 'Gagal memuat model AI');
+            throw error;
+        }
+    }
+
+    // Fungsi deteksi
+    async function detect() {
+        if (!state.isCameraReady || !state.isModelReady || !video.videoWidth) {
+            return;
+        }
+
+        try {
+            updateDetectionStatus('loading', 'Menganalisis gambar...');
+            
+            const predictions = await state.model.classify(video);
+            const topPrediction = predictions[0];
+            
+            processPrediction(topPrediction);
+            
+            state.lastScanTime = Date.now();
+        } catch (error) {
+            console.error('Error deteksi:', error);
+            updateDetectionStatus('error', 'Error deteksi AI');
+        }
+    }
+
+    // Proses hasil prediksi
+    function processPrediction(prediction) {
+        const className = prediction.className.toLowerCase();
+        const confidence = Math.round(prediction.probability * 100);
+        
+        // Update UI umum
+        confidenceBar.style.width = `${confidence}%`;
+        infoAccuracy.textContent = `${confidence}%`;
+        
+        // Cek apakah ini botol
+        const isBottle = className.includes('bottle') || 
+                        className.includes('water bottle') || 
+                        className.includes('pet bottle');
+        
+        if (isBottle) {
+            updateDetectionStatus('success', 'Botol terdeteksi');
+            infoType.textContent = 'Botol Minuman';
+            infoType.classList.add('bottle-detected');
+            infoMaterial.textContent = 'Plastik (PET)';
+            infoValue.textContent = 'Rp 300';
+            
+            // Update nilai spesifik botol
+            infoType.textContent = prediction.className.split(',')[0];
+        } else {
+            updateDetectionStatus('ready', 'Objek terdeteksi');
+            infoType.textContent = prediction.className.split(',')[0];
+            infoType.classList.remove('bottle-detected');
+            infoMaterial.textContent = '-';
+            infoValue.textContent = '-';
+        }
+    }
+
+    // Update status kamera
+    function updateCameraStatus(status, message) {
+        cameraStatus.textContent = message;
+        cameraStatusIcon.className = 'status-indicator';
+        
+        switch(status) {
+            case 'loading':
+                cameraStatusIcon.classList.add('status-loading');
+                break;
+            case 'ready':
+                cameraStatusIcon.classList.add('status-ready');
+                break;
+            case 'error':
+                cameraStatusIcon.classList.add('status-error');
+                break;
+        }
+    }
+
+    // Update status model
+    function updateModelStatus(status, message) {
+        modelStatus.textContent = message;
+        modelStatusIcon.className = 'status-indicator';
+        
+        switch(status) {
+            case 'loading':
+                modelStatusIcon.classList.add('status-loading');
+                break;
+            case 'ready':
+                modelStatusIcon.classList.add('status-ready');
+                break;
+            case 'error':
+                modelStatusIcon.classList.add('status-error');
+                break;
+        }
+    }
+
+    // Update status deteksi
+    function updateDetectionStatus(status, message) {
+        detectionStatus.textContent = message;
+        detectionStatusIcon.className = 'status-indicator';
+        
+        switch(status) {
+            case 'loading':
+                detectionStatusIcon.classList.add('status-loading');
+                break;
+            case 'ready':
+                detectionStatusIcon.classList.add('status-ready');
+                break;
+            case 'success':
+                detectionStatusIcon.classList.add('status-ready');
+                break;
+            case 'error':
+                detectionStatusIcon.classList.add('status-error');
+                break;
+        }
+    }
+
+    // Start auto scan
+    function startAutoScan() {
+        // Scan pertama segera
+        setTimeout(() => {
+            if (state.isCameraReady && state.isModelReady) {
+                detect();
+            }
+        }, 1000);
+        
+        // Scan interval setiap 2 detik
+        state.scanInterval = setInterval(() => {
+            if (state.isCameraReady && state.isModelReady) {
+                detect();
+            }
+        }, 2000);
+    }
+
+    // Inisialisasi aplikasi
+    async function initApp() {
+        try {
+            await Promise.all([initCamera(), loadModel()]);
+            startAutoScan();
+        } catch (error) {
+            console.error('Inisialisasi gagal:', error);
+        }
+    }
+
+    // Event listener untuk visibility change
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            if (state.scanInterval) {
+                clearInterval(state.scanInterval);
+                state.scanInterval = null;
+            }
+        } else {
+            if (!state.scanInterval && state.isCameraReady && state.isModelReady) {
+                startAutoScan();
+            }
+        }
+    });
+
+    // Start aplikasi saat halaman dimuat
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initApp);
+    } else {
+        initApp();
+    }
 </script>
-
-</body>
-</html>
-
